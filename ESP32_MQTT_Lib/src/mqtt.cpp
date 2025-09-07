@@ -1,4 +1,5 @@
 #include "mqtt.h"
+#include "config.h"
 
 void publish_motion(bool motion, PubSubClient &mqttClient,const char* state_topic) {
   if (!mqttClient.connected()) {
@@ -14,7 +15,7 @@ void reconnect_mqtt(PubSubClient &mqttClient, const char* client_id) {
     Serial.print("Connecting to MQTT...");
     bool connected;
         
-    connected = mqttClient.connect(client_id, "eeyteo", "wendering89");
+    connected = mqttClient.connect(client_id, MQTT_USER, MQTT_PASS);
       
     if (connected) {
         Serial.println(" connected!");
