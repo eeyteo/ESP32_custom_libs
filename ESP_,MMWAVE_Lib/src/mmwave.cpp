@@ -9,14 +9,14 @@ void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
     
     // Check for start of frame: AA AA
     if (c == 0xAA && sensor.lastByte == 0xAA) {
-      // We have two consecutive AA bytes - start of frame!
+      // two consecutive AA bytes - start of frame
       sensor.reset();
-      sensor.mmWaveBuffer[sensor.mmWaveIdx++] = sensor.lastByte; // Store first AA
-      sensor.mmWaveBuffer[sensor.mmWaveIdx++] = c;        // Store second AA
+      sensor.mmWaveBuffer[sensor.mmWaveIdx++] = sensor.lastByte; 
+      sensor.mmWaveBuffer[sensor.mmWaveIdx++] = c;     
       //Serial.println("- Frame start (AA AA)");
     } 
     else if (sensor.mmWaveIdx > 0) {
-      // We're already in a frame, continue storing
+      // in a frame, continue storing
       if (sensor.mmWaveIdx < sensor.buff_size) {
         sensor.mmWaveBuffer[sensor.mmWaveIdx++] = c;
         //Serial.println("- Stored");
@@ -26,7 +26,7 @@ void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
       }
     }
     
-    // Check for end of frame: 55 55
+    // end of frame: 55 55
     if (sensor.mmWaveIdx >= 2 && 
         sensor.mmWaveBuffer[sensor.mmWaveIdx-1] == 0x55 && 
         sensor.mmWaveBuffer[sensor.mmWaveIdx-2] == 0x55) {
@@ -36,7 +36,7 @@ void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
       sensor.reset();
     }
     
-    sensor.lastByte = c; // Remember current byte for next iteration
+    sensor.lastByte = c;
   }
 }
 
@@ -57,11 +57,11 @@ void processFrame(mmWaveSensor &sensor) {
     //Serial.print("Data type: 0x");
     //Serial.println(dataType, HEX);
     
-    if((dataType == 0x02 || dataType == 0x01)  && !sensor.notifiedPresence) { // Micromotion target
+    if((dataType == 0x02 || dataType == 0x01)  && !sensor.notifiedPresence) { // Micromotion or motion
       Serial.println("Data type: Micromotion target (0x02)");
       
       sensor.notifiedPresence = true; // Reset notification flag
-      // Extract distance data (bytes 5-6, little endian: 3F00 = 0x003F = 63)
+      // Extract distance data (bytes 5-6, little endian)
       uint16_t distance = (sensor.mmWaveBuffer[3] << 8) | sensor.mmWaveBuffer[4];
       Serial.print("Distance: ");
       Serial.print(distance);
@@ -74,7 +74,7 @@ void processFrame(mmWaveSensor &sensor) {
       sensor.presenceDetected = true;
       sensor.notifiedAbsence = false; // Allow absence notification
     }else if(dataType == 0x00 && !sensor.notifiedAbsence){ // No target
-      sensor.presenceDetected = false; // Reset presence after 5 seconds of no detection
+      sensor.presenceDetected = false; 
       Serial.print("No target detected: 0x");
       Serial.println(dataType, HEX);
       sensor.notifiedPresence = false; // Allow new presence notification
@@ -90,7 +90,7 @@ void processFrame(mmWaveSensor &sensor) {
 
 void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
     bool mmWaveConnected = false;
-  // Initialize serial - returns void, so we can't check directly
+  // Initialize serial
   ld2411Serial.begin(256000, SERIAL_8N1, 16, 17);
   
   // Verify by checking if we receive data
