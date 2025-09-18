@@ -56,11 +56,12 @@ void processFrame(mmWaveSensor &sensor) {
     uint8_t dataType = sensor.mmWaveBuffer[2];
     //Serial.print("Data type: 0x");
     //Serial.println(dataType, HEX);
+    unsigned long currentTime = millis();
     
     if((dataType == 0x02 || dataType == 0x01)  && !sensor.notifiedPresence) { // Micromotion or motion
       Serial.println("Data type: Micromotion target (0x02)");
       
-      sensor.notifiedPresence = true; // Reset notification flag
+      
       // Extract distance data (bytes 5-6, little endian)
       uint16_t distance = (sensor.mmWaveBuffer[3] << 8) | sensor.mmWaveBuffer[4];
       Serial.print("Distance: ");
@@ -71,14 +72,23 @@ void processFrame(mmWaveSensor &sensor) {
       if(sensor.buf_len >= 7 && sensor.mmWaveBuffer[5] == 0x55 && sensor.mmWaveBuffer[6] == 0x55) {
         //Serial.println("End of frame: 55 55 found");
       }
+      sensor.lastPresenceTime = currentTime;
+      sensor.notifiedPresence = true; // Reset notification flag
       sensor.presenceDetected = true;
       sensor.notifiedAbsence = false; // Allow absence notification
     }else if(dataType == 0x00 && !sensor.notifiedAbsence){ // No target
-      sensor.presenceDetected = false; 
-      Serial.print("No target detected: 0x");
-      Serial.println(dataType, HEX);
-      sensor.notifiedPresence = false; // Allow new presence notification
-      sensor.notifiedAbsence = true; // Set absence notification flag
+
+      // Debounce absence
+      if (currentTime - sensor.lastPresenceTime > sensor.absenceDebounceDelay) {
+        sensor.presenceDetected = false;
+        sensor.notifiedPresence = false;
+        sensor.notifiedAbsence = true;
+        Serial.print("No target detected: 0x");
+        Serial.print(dataType, HEX);
+        Serial.println(", Confirmed absence (after debounce)");
+      } else {
+        Serial.println("Ignoring brief absence (debouncing)");
+      }
     }
 
     

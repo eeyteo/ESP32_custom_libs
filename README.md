@@ -14,18 +14,24 @@ A collection of libraries for the ESP32 platform, designed to simplify common ta
 Include the libraries in your PlatformIO project. Add to plarformIO.ini file this project
 
 ```xml
-lib_extra_dirs = C:\Users\khons\Documents\PlatformIO\Libs
+lib_extra_dirs = ..\PlatformIO\Libs
 ```
 
 ## ESP32_MQQT_Lib
-The main function in this library is
+The main functions in this library are
 ```xml
-void publish_motion(bool motion, PubSubClient &mqttClient,const char* state_topic)
+void publish_motion(bool motion, PubSubClient &mqttClient, const char* client_id, const char* topic);
 ```
 This function publish a boolean value to your Home Assistant MQTT adds on's state topic
 
+and
+```xml
+void mqttCallback(char* topic, byte* payload, unsigned int length);
+```
+This function will listen to messages coming from esp home
+
 ## ESP32_MMWAVE_Lib
-Since all the 2025's breking changes to ESP Home, unfortunatelly it's no longer possible to easily integrate sensors such as the mmWave LD2411S into ESP Home. A standard platformIO project is required.
+Since the 2025.2.0 breking changes to ESP Home, unfortunatelly it's no longer possible to easily integrate sensors such as the mmWave LD2411S into ESP Home. A standard platformIO project is required.
 The main function here is 
 ```xml
 void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {

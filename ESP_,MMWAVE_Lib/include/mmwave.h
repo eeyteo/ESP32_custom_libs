@@ -18,9 +18,20 @@ struct mmWaveSensor {
     bool notifiedPresence;
     bool notifiedAbsence;
 
-    // add default constructor
-    mmWaveSensor() : connected(false), distance(0), mmWaveIdx(0), buff_size(BUF_SIZE), buf_len(0), lastByte(0), presenceDetected(false), notifiedPresence(false), notifiedAbsence(false) {}
+    // debounce variables
+    unsigned long lastPresenceTime;
+    unsigned long lastAbsenceTime;
+    const unsigned long presenceDebounceDelay = 1000;  // 1 second debounce for presence
+    const unsigned long absenceDebounceDelay = 3000;   // 3 second debounce for absence
 
+
+    // default constructor
+   mmWaveSensor() : connected(false), distance(0), mmWaveIdx(0), 
+                    buff_size(BUF_SIZE), buf_len(0), lastByte(0), 
+                    presenceDetected(false), notifiedPresence(false), 
+                    notifiedAbsence(false), lastPresenceTime(0), 
+                    lastAbsenceTime(0) {}
+                    
     void showFrame() {
         Serial.print("mmWave Frame of lenth ");
         Serial.print(buf_len);
