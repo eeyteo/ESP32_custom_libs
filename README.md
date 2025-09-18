@@ -17,7 +17,7 @@ Include the libraries in your PlatformIO project. Add to plarformIO.ini file thi
 lib_extra_dirs = ..\PlatformIO\Libs
 ```
 
-## ESP32_MQQT_Lib
+## ESP32_MQTT_Lib
 The main functions in this library are
 ```xml
 void publish_motion(bool motion, PubSubClient &mqttClient, const char* client_id, const char* topic);
