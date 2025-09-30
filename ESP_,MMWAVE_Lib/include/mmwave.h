@@ -3,7 +3,7 @@
 
 #include <HardwareSerial.h>
 
-#define BUF_SIZE 64
+#define BUF_SIZE 128
 
 struct mmWaveSensor {
     bool connected;
@@ -18,6 +18,12 @@ struct mmWaveSensor {
     bool notifiedPresence;
     bool notifiedAbsence;
 
+    // Parameters
+    uint16_t maxMotionRange;
+    uint16_t minMotionRange;
+    uint16_t maxMicroMotionRange;
+    uint16_t minMicroMotionRange;
+    uint16_t noOneWaitingTime; //[ds]
     // debounce variables
     unsigned long lastPresenceTime;
     unsigned long lastAbsenceTime;
@@ -29,6 +35,7 @@ struct mmWaveSensor {
    mmWaveSensor() : connected(false), distance(0), mmWaveIdx(0), 
                     buff_size(BUF_SIZE), buf_len(0), lastByte(0), 
                     presenceDetected(false), notifiedPresence(false), 
+                    maxMotionRange(0), minMotionRange(0), maxMicroMotionRange(0), minMicroMotionRange(0), noOneWaitingTime(0),
                     notifiedAbsence(false), lastPresenceTime(0), 
                     lastAbsenceTime(0) {}
                     
@@ -53,4 +60,17 @@ void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
 void processFrame(mmWaveSensor &sensor);
 void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
 bool checkMMWaveConnection(HardwareSerial &ld2411Serial) ;
+bool sendEnableConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+bool sendEndConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor &sensor, unsigned long timeout = 1000);
+bool sendReboot(HardwareSerial &ld2411Serial);
+bool sendCommand(HardwareSerial &ld2411Serial, uint16_t cmdId, const uint8_t* data, uint8_t dataLen, mmWaveSensor &sensor);
+bool setMinDistance(HardwareSerial &ld2411Serial, uint8_t decimeters);
+bool setMaxDistance(HardwareSerial &ld2411Serial, uint8_t decimeters);
+bool setSensitivity(HardwareSerial &ld2411Serial, uint8_t level);
+bool setHoldTime(HardwareSerial &ld2411Serial, uint8_t seconds);
+bool setWorkMode(HardwareSerial &ld2411Serial, uint8_t mode);
+bool enableUART(HardwareSerial &ld2411Serial, bool enable);
+bool resetToDefault(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
 #endif
