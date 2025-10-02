@@ -99,18 +99,19 @@ void processFrame(mmWaveSensor &sensor) {
 }
 
 void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
-  bool mmWaveConnected = false;
   // Initialize serial
   ld2411Serial.begin(256000, SERIAL_8N1, 16, 17);
   
-  // Verify by checking if we receive data
-  mmWaveConnected = checkMMWaveConnection(ld2411Serial);
-  if(mmWaveConnected) {
-      sensor.connected = true;
+  delay(200); // allow sensor to boot
+
+  // Try to read parameters as a connectivity test
+  if (getParam(ld2411Serial, sensor)) {
+    sensor.connected = true;
+    Serial.println("LD2411S connected!"); 
   } else {
-      sensor.connected = false;
+    sensor.connected = false;
+    Serial.println("LD2411S not responding to getParam");
   }
-  Serial.println(mmWaveConnected ? "LD2411S connected!" : "LD2411S not detected");
 }
 
 bool checkMMWaveConnection(HardwareSerial &ld2411Serial) {
@@ -315,9 +316,6 @@ bool sendCommand(HardwareSerial &ld2411Serial, uint16_t cmdId, const uint8_t* da
 
 
 
-bool resetToDefault(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
-  return sendCommand(ld2411Serial, 0x0068, nullptr, 0, sensor);
-}
 
 bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
   // Variables to store all parameters
@@ -362,11 +360,11 @@ bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
     Serial.println("===================================");
 
     // Update the parameters
-    sensor.maxMotionRange = maxMotionRange;
-    sensor.minMotionRange = minMotionRange;
-    sensor.maxMicroMotionRange = maxMotionRange;
-    sensor.minMicroMotionRange = minMotionRange;
-    sensor.noOneWaitingTime = noOneWaitingTime;
+    sensor.maxMotionRange.value = maxMotionRange;
+    sensor.minMotionRange.value = minMotionRange;
+    sensor.maxMicroMotionRange.value = maxMotionRange;
+    sensor.minMicroMotionRange.value = minMotionRange;
+    sensor.noOneWaitingTime.value = noOneWaitingTime;
 
   } else {
     Serial.println("ACK response too short to contain parameters");
@@ -382,3 +380,127 @@ bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
   return true;
 }
 
+bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, 
+                  intValue &paramToSet, uint16_t newValue) {
+    
+    // Validate the new value
+    if (newValue < paramToSet.min || newValue > paramToSet.max) {
+        Serial.printf("Error: Value %d out of range [%d, %d]\n", 
+                     newValue, paramToSet.min, paramToSet.max);
+        return false;
+    }
+
+    Serial.printf("Setting parameter to %d (range: %d-%d)\n", 
+                 newValue, paramToSet.min, paramToSet.max);
+
+    // Enable configuration mode first
+    if (!sendEnableConfig(ld2411Serial, sensor)) {
+        Serial.println("Failed to enable configuration mode");
+        return false;
+    }
+
+    delay(100);
+
+    // Update the parameter in our struct
+    paramToSet.value = newValue;
+
+    // Prepare the parameter data according to Table 7 in protocol
+    uint8_t paramData[20] = {0}; // 20 bytes parameter data
+
+    // Fill the parameter data structure
+    // Bytes 0-1: Reserved (00 00)
+    paramData[0] = 0x00;
+    paramData[1] = 0x00;
+    
+    // Bytes 2-3: Maximum range of motion (little-endian)
+    paramData[2] = sensor.maxMotionRange.value & 0xFF;
+    paramData[3] = (sensor.maxMotionRange.value >> 8) & 0xFF;
+    
+    // Bytes 4-5: Reserved (00 00)
+    paramData[4] = 0x00;
+    paramData[5] = 0x00;
+    
+    // Bytes 6-7: Fixed (01 00)
+    paramData[6] = 0x01;
+    paramData[7] = 0x00;
+    
+    // Bytes 8-9: Recent range of motion (little-endian)
+    paramData[8] = sensor.minMotionRange.value & 0xFF;
+    paramData[9] = (sensor.minMotionRange.value >> 8) & 0xFF;
+    
+    // Bytes 10-11: Reserved (00 00)
+    paramData[10] = 0x00;
+    paramData[11] = 0x00;
+    
+    // Bytes 12-13: Fixed (02 00)
+    paramData[12] = 0x02;
+    paramData[13] = 0x00;
+    
+    // Bytes 14-15: Maximum micro-movement range (little-endian)
+    paramData[14] = sensor.maxMicroMotionRange.value & 0xFF;
+    paramData[15] = (sensor.maxMicroMotionRange.value >> 8) & 0xFF;
+    
+    // Bytes 16-17: Reserved (00 00)
+    paramData[16] = 0x00;
+    paramData[17] = 0x00;
+    
+    // Bytes 18-19: Fixed (03 00)
+    paramData[18] = 0x03;
+    paramData[19] = 0x00;
+    
+    // Bytes 20-21: Recent micro-movement range (little-endian)
+    paramData[20] = sensor.minMicroMotionRange.value & 0xFF;
+    paramData[21] = (sensor.minMicroMotionRange.value >> 8) & 0xFF;
+    
+    // Bytes 22-23: Reserved (00 00)
+    paramData[22] = 0x00;
+    paramData[23] = 0x00;
+    
+    // Bytes 24-25: Fixed (04 00)
+    paramData[24] = 0x04;
+    paramData[25] = 0x00;
+    
+    // Bytes 26-27: No one duration (little-endian)
+    paramData[26] = sensor.noOneWaitingTime.value & 0xFF;
+    paramData[27] = (sensor.noOneWaitingTime.value >> 8) & 0xFF;
+    
+    // Bytes 28-29: Reserved (00 00)
+    paramData[28] = 0x00;
+    paramData[29] = 0x00;
+
+    // Send the set parameter command
+    if (!sendCommand(ld2411Serial, 0x0067, paramData, 30, sensor)) {
+        Serial.println("Failed to set parameters");
+        sendEndConfig(ld2411Serial, sensor);
+        return false;
+    }
+
+    Serial.println("Parameters set successfully");
+
+    // Disable configuration mode
+    if (!sendEndConfig(ld2411Serial, sensor)) {
+        Serial.println("Warning: Failed to disable configuration mode");
+    }
+
+    return true;
+}
+
+bool setMaxMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
+    return setParameter(ld2411Serial, sensor, sensor.maxMotionRange, value);
+}
+
+bool setMinMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
+    return setParameter(ld2411Serial, sensor, sensor.minMotionRange, value);
+}
+
+bool setMaxMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
+    return setParameter(ld2411Serial, sensor, sensor.maxMicroMotionRange, value);
+}
+
+bool setMinMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
+    return setParameter(ld2411Serial, sensor, sensor.minMicroMotionRange, value);
+}
+
+bool setNoOneWaitingTime(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
+    return setParameter(ld2411Serial, sensor, sensor.noOneWaitingTime, value);
+}

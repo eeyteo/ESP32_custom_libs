@@ -5,12 +5,21 @@
 
 #define BUF_SIZE 128
 
+struct intValue{
+   uint16_t value;
+   uint16_t min;
+   uint16_t max;
+   // default constructor
+   intValue(): value(0), min(0), max(0){}
+   // parameterized constructor
+   intValue(uint16_t v, uint16_t mi, uint16_t ma): value(v), min(mi), max(ma){}
+};
 struct mmWaveSensor {
     bool connected;
     uint16_t distance; // in cm
     uint8_t mmWaveBuffer[BUF_SIZE];
     uint8_t mmWaveIdx;
-    uint8_t buff_size;
+    uint16_t buff_size;
     uint8_t buf_len;
     uint8_t lastByte;
    
@@ -19,11 +28,11 @@ struct mmWaveSensor {
     bool notifiedAbsence;
 
     // Parameters
-    uint16_t maxMotionRange;
-    uint16_t minMotionRange;
-    uint16_t maxMicroMotionRange;
-    uint16_t minMicroMotionRange;
-    uint16_t noOneWaitingTime; //[ds]
+    intValue maxMotionRange;
+    intValue minMotionRange;
+    intValue maxMicroMotionRange;
+    intValue minMicroMotionRange;
+    intValue noOneWaitingTime; //[ds]
     // debounce variables
     unsigned long lastPresenceTime;
     unsigned long lastAbsenceTime;
@@ -31,12 +40,17 @@ struct mmWaveSensor {
     const unsigned long absenceDebounceDelay = 3000;   // 3 second debounce for absence
 
 
-    // default constructor
-   mmWaveSensor() : connected(false), distance(0), mmWaveIdx(0), 
+    // constructor - using parameterized intValue constructors
+    mmWaveSensor() : connected(false), distance(0), mmWaveIdx(0), 
                     buff_size(BUF_SIZE), buf_len(0), lastByte(0), 
                     presenceDetected(false), notifiedPresence(false), 
-                    maxMotionRange(0), minMotionRange(0), maxMicroMotionRange(0), minMicroMotionRange(0), noOneWaitingTime(0),
-                    notifiedAbsence(false), lastPresenceTime(0), 
+                    notifiedAbsence(false),
+                    maxMotionRange(0, 30, 717),      // Use parameterized constructor
+                    minMotionRange(0, 30, 717),
+                    maxMicroMotionRange(0, 30, 425),
+                    minMicroMotionRange(0, 30, 425),
+                    noOneWaitingTime(0, 0, 65535),
+                    lastPresenceTime(0), 
                     lastAbsenceTime(0) {}
                     
     void showFrame() {
@@ -65,12 +79,12 @@ bool sendEndConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
 bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor &sensor, unsigned long timeout = 1000);
 bool sendReboot(HardwareSerial &ld2411Serial);
 bool sendCommand(HardwareSerial &ld2411Serial, uint16_t cmdId, const uint8_t* data, uint8_t dataLen, mmWaveSensor &sensor);
-bool setMinDistance(HardwareSerial &ld2411Serial, uint8_t decimeters);
-bool setMaxDistance(HardwareSerial &ld2411Serial, uint8_t decimeters);
-bool setSensitivity(HardwareSerial &ld2411Serial, uint8_t level);
-bool setHoldTime(HardwareSerial &ld2411Serial, uint8_t seconds);
-bool setWorkMode(HardwareSerial &ld2411Serial, uint8_t mode);
-bool enableUART(HardwareSerial &ld2411Serial, bool enable);
-bool resetToDefault(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
 bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, 
+                  intValue &paramToSet, uint16_t newValue);
+bool setMaxMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setMinMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setMaxMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setMinMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setNoOneWaitingTime(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
 #endif
