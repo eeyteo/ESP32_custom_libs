@@ -151,69 +151,72 @@ bool checkMMWaveConnection(HardwareSerial &ld2411Serial) {
 
 bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor &sensor, unsigned long timeout) {
   unsigned long start = millis();
+  uint8_t tempBuffer[128];
   size_t idx = 0;
 
   Serial.printf("Waiting for ACK for command 0x%04X, timeout: %lums\n", expectedID, timeout);
-  sensor.reset(); // Clear the buffer
 
   while (millis() - start < timeout) {
     if (ld2411Serial.available()) {
       uint8_t b = ld2411Serial.read();
       
-      // DEBUG: Show what we're receiving
-      // Serial.printf("%02X ", b);
+      Serial.printf("%02X ", b);
 
-      // Store byte if space available in sensor buffer
-      if (idx < sensor.buff_size) {
-        sensor.mmWaveBuffer[idx++] = b;
-        sensor.buf_len = idx;
+      // Store in temporary buffer
+      if (idx < sizeof(tempBuffer)) {
+        tempBuffer[idx++] = b;
       } else {
-        Serial.printf("\nSensor buffer full at %d bytes! Buffer content: ", idx);
-        for (int i = 0; i < sensor.buf_len; i++) {
-          Serial.printf("%02X ", sensor.mmWaveBuffer[i]);
-        }
-        Serial.println();
-        return false;
+        Serial.println("\nTemp buffer full, resetting");
+        idx = 0;
+        continue;
       }
-      
-      // Check if we have at least the header + length
-      if (idx >= 6) {
-        // Verify command response header
-        if (sensor.mmWaveBuffer[0] == 0xFD && sensor.mmWaveBuffer[1] == 0xFC && 
-            sensor.mmWaveBuffer[2] == 0xFB && sensor.mmWaveBuffer[3] == 0xFA) {
+
+      // Check for complete command frame
+      if (idx >= 10) { // Minimum size for a command frame
+        if (tempBuffer[0] == 0xFD && tempBuffer[1] == 0xFC && 
+            tempBuffer[2] == 0xFB && tempBuffer[3] == 0xFA) {
           
-          // Extract data length (little-endian)
-          uint16_t dataLen = sensor.mmWaveBuffer[4] | (sensor.mmWaveBuffer[5] << 8);
-          
-          // Calculate total frame length: header(4) + length(2) + data + footer(4)
+          uint16_t dataLen = tempBuffer[4] | (tempBuffer[5] << 8);
           uint16_t totalLen = 4 + 2 + dataLen + 4;
           
-          // Check if we have complete frame
           if (idx >= totalLen) {
             // Verify footer
-            if (sensor.mmWaveBuffer[totalLen-4] == 0x04 && sensor.mmWaveBuffer[totalLen-3] == 0x03 &&
-                sensor.mmWaveBuffer[totalLen-2] == 0x02 && sensor.mmWaveBuffer[totalLen-1] == 0x01) {
+            if (tempBuffer[totalLen-4] == 0x04 && tempBuffer[totalLen-3] == 0x03 &&
+                tempBuffer[totalLen-2] == 0x02 && tempBuffer[totalLen-1] == 0x01) {
               
-              // Extract command ID from ACK (little-endian)
-              uint16_t ackCmdId = sensor.mmWaveBuffer[6] | (sensor.mmWaveBuffer[7] << 8);
-              
-              Serial.printf("Received ACK command ID: 0x%04X\n", ackCmdId);
-              
-              // In ACK responses, the command ID has bit 8 set
-              uint16_t expectedAckId = expectedID | 0x0100;
-              
-              if (ackCmdId == expectedAckId) {
-                // Check ACK status (bytes 8-9)
-                uint16_t status = sensor.mmWaveBuffer[8] | (sensor.mmWaveBuffer[9] << 8);
-                if (status == 0x0000) {
-                  Serial.println("ACK SUCCESS - Data captured in sensor buffer");
-                  return true;
-                } else {
-                  Serial.printf("ACK failed with status: 0x%04X\n", status);
-                  return false;
+              // Copy valid frame to sensor buffer
+              if (totalLen <= sensor.buff_size) {
+                memcpy(sensor.mmWaveBuffer, tempBuffer, totalLen);
+                sensor.buf_len = totalLen;
+                
+                uint16_t ackCmdId = tempBuffer[6] | (tempBuffer[7] << 8);
+                Serial.printf("\nReceived ACK command ID: 0x%04X\n", ackCmdId);
+                
+                uint16_t expectedAckId = expectedID | 0x0100;
+                if (ackCmdId == expectedAckId) {
+                  uint16_t status = tempBuffer[8] | (tempBuffer[9] << 8);
+                  if (status == 0x0000) {
+                    Serial.println("ACK SUCCESS");
+                    return true;
+                  }
                 }
               }
             }
+            // Frame processed, reset for next one
+            idx = 0;
+          }
+        }
+        // Check for distance frame and skip it
+        else if (tempBuffer[0] == 0xAA && tempBuffer[1] == 0xAA) {
+          // Look for distance frame end
+          if (idx >= 6 && tempBuffer[idx-2] == 0x55 && tempBuffer[idx-1] == 0x55) {
+            Serial.println("\nSkipped distance frame");
+            idx = 0; // Reset temp buffer, ready for next frame
+          }
+          // If buffer getting full without finding end, reset
+          else if (idx >= sizeof(tempBuffer) - 10) {
+            Serial.println("\nBuffer full, no complete frame found");
+            idx = 0;
           }
         }
       }
@@ -221,19 +224,25 @@ bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor 
     delay(1);
   }
   
-  Serial.println("ACK timeout");
+  Serial.println("\nACK timeout");
   return false;
 }
 
 bool sendEnableConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
 
-  // Clear all previous distance data from serial buffer
-  while (ld2411Serial.available()) {
-    ld2411Serial.read();
+  // More aggressive buffer clearing
+  unsigned long clearStart = millis();
+  Serial.println("Clearing serial buffer...");
+  while (ld2411Serial.available() || (millis() - clearStart < 100)) {
+    if (ld2411Serial.available()) {
+      uint8_t discarded = ld2411Serial.read();
+      Serial.printf("Discarded: %02X ", discarded);
+    }
+    delay(1);
   }
-
+  Serial.println("\nBuffer cleared");
+  
   uint8_t cmd[] = {0xFD,0xFC,0xFB,0xFA,0x04,0x00,0xFF,0x00,0x01,0x00,0x04,0x03,0x02,0x01};
-  ld2411Serial.write(cmd, sizeof(cmd));
   Serial.print("Sending enable config: ");
   for (int i = 0; i < sizeof(cmd); i++) {
     Serial.printf("%02X ", cmd[i]);
@@ -405,7 +414,7 @@ bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor,
     paramToSet.value = newValue;
 
     // Prepare the parameter data according to Table 7 in protocol
-    uint8_t paramData[20] = {0}; // 20 bytes parameter data
+    uint8_t paramData[30] = {0}; // 30 bytes parameter data
 
     // Fill the parameter data structure
     // Bytes 0-1: Reserved (00 00)
