@@ -68,6 +68,22 @@ struct mmWaveSensor {
         buf_len = 0;
         memset(mmWaveBuffer, 0, BUF_SIZE);
     }
+
+    void showParam() {
+        Serial.println("=== LD2411-S Current Parameters ===");
+        Serial.printf("Maximum Motion Range: %d cm (Range: %d-%d)\n", 
+                      maxMotionRange.value, maxMotionRange.min, maxMotionRange.max);
+        Serial.printf("Minimum Motion Range: %d cm (Range: %d-%d)\n", 
+                      minMotionRange.value, minMotionRange.min, minMotionRange.max);
+        Serial.printf("Maximum Micro-Motion Range: %d cm (Range: %d-%d)\n", 
+                      maxMicroMotionRange.value, maxMicroMotionRange.min, maxMicroMotionRange.max);
+        Serial.printf("Minimum Micro-Motion Range: %d cm (Range: %d-%d)\n", 
+                      minMicroMotionRange.value, minMicroMotionRange.min, minMicroMotionRange.max);
+        Serial.printf("No One Waiting Time: %d units (%.1f seconds) (Range: %d-%d)\n", 
+                      noOneWaitingTime.value, noOneWaitingTime.value * 0.1, 
+                      noOneWaitingTime.min, noOneWaitingTime.max);
+        Serial.println("===================================");
+    }
 };
 
 void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
