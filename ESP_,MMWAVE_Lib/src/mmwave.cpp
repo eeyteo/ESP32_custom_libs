@@ -1,14 +1,12 @@
 #include "mmwave.h"
 
-
-
-void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
+void listenMMwave(mmWaveSensor &sensor) {
   // This function listens to the serial port for incoming data from the LD2411S sensor.
   // It detects frames starting with AA AA and ending with 55 55, storing them in sensor.mmWaveBuffer.
   // When a complete frame is received, it calls processFrame() to handle the data.
 
-  while (ld2411Serial.available()) {
-    uint8_t c = ld2411Serial.read();
+  while (sensor.serialPort->available()) {
+    uint8_t c = sensor.serialPort->read();
     
     // Check for start of frame: AA AA
     if (c == 0xAA && sensor.lastByte == 0xAA) {
@@ -16,12 +14,14 @@ void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
       sensor.reset();
       sensor.mmWaveBuffer[sensor.mmWaveIdx++] = sensor.lastByte; 
       sensor.mmWaveBuffer[sensor.mmWaveIdx++] = c;     
-      //Serial.println("- Frame start (AA AA)");
+      //Serial.print("- Frame start (AA AA)");
     } 
     else if (sensor.mmWaveIdx > 0) {
       // in a frame, continue storing
       if (sensor.mmWaveIdx < sensor.buff_size) {
         sensor.mmWaveBuffer[sensor.mmWaveIdx++] = c;
+        //Serial.print(" ");
+        //Serial.print(c, HEX);
         //Serial.println("- Stored");
       } else {
         //Serial.println("- Buffer full, resetting");
@@ -35,6 +35,7 @@ void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
         sensor.mmWaveBuffer[sensor.mmWaveIdx-2] == 0x55) {
       sensor.buf_len = sensor.mmWaveIdx;
       //Serial.println("- End of frame (55 55)");
+      if(sensor.t) sensor.showFrame();
       processFrame(sensor);
       sensor.reset();
     }
@@ -103,16 +104,16 @@ void processFrame(mmWaveSensor &sensor) {
   }
 }
 
-void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
+void initMMWaveSensor(mmWaveSensor &sensor) {
   // This function initializes the LD2411S sensor
 
   // Initialize serial
-  ld2411Serial.begin(256000, SERIAL_8N1, 16, 17);
+  sensor.serialPort->begin(256000, SERIAL_8N1, sensor.rxPin, sensor.txPin);
   
   delay(200); // allow sensor to boot
 
   // Try to read parameters as a connectivity test
-  if (getParam(ld2411Serial, sensor)) {
+  if (getParam(sensor)) {
     sensor.connected = true;
     Serial.println("LD2411S connected!"); 
   } else {
@@ -159,19 +160,19 @@ bool checkMMWaveConnection(HardwareSerial &ld2411Serial) {
     return false;
 }
 
-bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor &sensor, unsigned long timeout) {
+bool waitForAck(uint16_t expectedid, mmWaveSensor &sensor, unsigned long timeout) {
   //This function reads from the serial port until it finds a valid ACK frame
-  // matching the expected command ID or until the timeout is reached.
+  // matching the expected command id or until the timeout is reached.
 
   unsigned long start = millis();
   uint8_t tempBuffer[128];
   size_t idx = 0;
   bool start_frame = false;
-  Serial.printf("Waiting for ACK for command 0x%04X, timeout: %lums\n", expectedID, timeout);
+  Serial.printf("Waiting for ACK for command 0x%04X, timeout: %lums\n", expectedid, timeout);
 
   while (millis() - start < timeout) {
-    if (ld2411Serial.available()) {
-      uint8_t b = ld2411Serial.read();
+    if (sensor.serialPort->available()) {
+      uint8_t b = sensor.serialPort->read();
       
       //Serial.printf("%02X ", b);
       
@@ -208,9 +209,9 @@ bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor 
                 
                 
                 uint16_t ackCmdId = tempBuffer[6] | (tempBuffer[7] << 8);
-                Serial.printf("\nReceived ACK command ID: 0x%04X\n", ackCmdId);
+                Serial.printf("\nReceived ACK command id: 0x%04X\n", ackCmdId);
                 
-                uint16_t expectedAckId = expectedID | 0x0100;
+                uint16_t expectedAckId = expectedid | 0x0100;
                 if (ackCmdId == expectedAckId) {
                   uint16_t status = tempBuffer[8] | (tempBuffer[9] << 8);
                   if (status == 0x0000) {
@@ -233,16 +234,16 @@ bool waitForAck(HardwareSerial &ld2411Serial, uint16_t expectedID, mmWaveSensor 
   return false;
 }
 
-bool sendEnableConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
+bool sendEnableConfig(mmWaveSensor &sensor) {
   // This function sends the command to enable configuration mode (0x00FF)
   // and waits for the corresponding ACK.
 
   // buffer clearing
   unsigned long clearStart = millis();
   Serial.println("Clearing serial buffer...");
-  while (ld2411Serial.available() || (millis() - clearStart < 100)) {
-    if (ld2411Serial.available()) {
-      uint8_t discarded = ld2411Serial.read();
+  while (sensor.serialPort->available() || (millis() - clearStart < 100)) {
+    if (sensor.serialPort->available()) {
+      uint8_t discarded = sensor.serialPort->read();
       //Serial.printf("Discarded: %02X ", discarded);
     }
     delay(1);
@@ -257,20 +258,20 @@ bool sendEnableConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
   }
   Serial.println();
   
-  ld2411Serial.write(cmd, sizeof(cmd));
-  ld2411Serial.flush();
+  sensor.serialPort->write(cmd, sizeof(cmd));
+  sensor.serialPort->flush();
   
-  return waitForAck(ld2411Serial, 0xFF, sensor);
+  return waitForAck(0xFF, sensor);
 }
 
 
-bool sendEndConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
+bool sendEndConfig(mmWaveSensor &sensor) {
   // This function sends the command to disable configuration mode (0x00FE)
   // and waits for the corresponding ACK.
 
   // buffer cleaning
-  while (ld2411Serial.available()) {
-    ld2411Serial.read();
+  while (sensor.serialPort->available()) {
+    sensor.serialPort->read();
   }
   sensor.reset();
   
@@ -282,28 +283,20 @@ bool sendEndConfig(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
   }
   Serial.println();
   
-  ld2411Serial.write(cmd, sizeof(cmd));
-  ld2411Serial.flush();
+  sensor.serialPort->write(cmd, sizeof(cmd));
+  sensor.serialPort->flush();
   
-  return waitForAck(ld2411Serial, 0xFE, sensor);
+  return waitForAck(0xFE, sensor);
 }
 
 
-bool sendReboot(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
-  // This function sends the reboot command (0x0004) to the sensor
-  // and waits for the corresponding ACK.
-  uint8_t cmd[] = {0xFD,0xFC,0xFB,0xFA,0x02,0x00,0x04,0x00,0x04,0x03,0x02,0x01};
-  ld2411Serial.write(cmd, sizeof(cmd));
-  return waitForAck(ld2411Serial, 0x0004, sensor);
-}
-
-bool sendCommand(HardwareSerial &ld2411Serial, uint16_t cmdId, const uint8_t* data, uint8_t dataLen, mmWaveSensor &sensor) {
+bool sendCommand(uint16_t cmdId, const uint8_t* data, uint8_t dataLen, mmWaveSensor &sensor) {
   // This function sends a generic command with optional data to the sensor
   // and waits for the corresponding ACK.
 
   // Clear any pending data first
-  while (ld2411Serial.available()) {
-    ld2411Serial.read();
+  while (sensor.serialPort->available()) {
+    sensor.serialPort->read();
   }
   sensor.reset();
   // Header
@@ -319,7 +312,7 @@ bool sendCommand(HardwareSerial &ld2411Serial, uint16_t cmdId, const uint8_t* da
   packet[idx++] = len & 0xFF;
   packet[idx++] = (len >> 8) & 0xFF;
 
-  // Command ID
+  // Command id
   packet[idx++] = cmdId & 0xFF;
   packet[idx++] = (cmdId >> 8) & 0xFF;
 
@@ -335,14 +328,14 @@ bool sendCommand(HardwareSerial &ld2411Serial, uint16_t cmdId, const uint8_t* da
   packet[idx++] = 0x01;
 
   // send the packet
-  ld2411Serial.write(packet, idx);
-  ld2411Serial.flush();
+  sensor.serialPort->write(packet, idx);
+  sensor.serialPort->flush();
 
-  return waitForAck(ld2411Serial, cmdId, sensor);
+  return waitForAck(cmdId, sensor);
 }
 
 
-bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
+bool getParam(mmWaveSensor &sensor) {
   // This function retrieves the current parameters from the LD2411S sensor
   // by sending the read parameters command (0x0073) and parsing the ACK response
 
@@ -354,17 +347,17 @@ bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
   int noOneWaitingTime;      // Unattended waiting time (in 100ms units)
   
   
-  if(!sendEnableConfig(ld2411Serial, sensor)){
+  if(!sendEnableConfig(sensor)){
     Serial.println("Failed to enable configuration mode");
     return false;
   }
   
-  delay(100); // Small delay between commands
+  delay(100);
   // Send read parameters command (0x0073)
   Serial.println("Requesting parameters with command 0x0073...");
-  if(!sendCommand(ld2411Serial, 0x0073, nullptr, 0, sensor)){
+  if(!sendCommand(0x0073, nullptr, 0, sensor)){
     Serial.println("Failed to send read parameters command");
-    sendEndConfig(ld2411Serial, sensor); // Try to clean up
+    sendEndConfig(sensor); // Try to clean up
     return false;
   } 
   Serial.println("Parameter data received in ACK:");
@@ -382,8 +375,8 @@ bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
     // Update the parameters
     sensor.maxMotionRange.value = maxMotionRange;
     sensor.minMotionRange.value = minMotionRange;
-    sensor.maxMicroMotionRange.value = maxMotionRange;
-    sensor.minMicroMotionRange.value = minMotionRange;
+    sensor.maxMicroMotionRange.value = maxMicroMotionRange;
+    sensor.minMicroMotionRange.value = minMicroMotionRange;
     sensor.noOneWaitingTime.value = noOneWaitingTime;
 
     // Print all parameters
@@ -391,19 +384,19 @@ bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
     
   } else {
     Serial.println("ACK response too short to contain parameters");
-    sendEndConfig(ld2411Serial, sensor);
+    sendEndConfig(sensor);
     return false;
   }
 
   // Disable configuration mode
-  if (!sendEndConfig(ld2411Serial, sensor)) {
+  if (!sendEndConfig(sensor)) {
     Serial.println("Warning: Failed to disable configuration mode");
   }
 
   return true;
 }
 
-bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, 
+bool setParameter(mmWaveSensor &sensor, 
                   intValue &paramToSet, uint16_t newValue) {
   // This function sets a specific parameter on the LD2411S sensor
   // It enables configuration mode, updates the parameter, sends the set command (0x0067),
@@ -420,7 +413,7 @@ bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor,
                  newValue, paramToSet.min, paramToSet.max);
 
     // Enable configuration mode first
-    if (!sendEnableConfig(ld2411Serial, sensor)) {
+    if (!sendEnableConfig(sensor)) {
         Serial.println("Failed to enable configuration mode");
         return false;
     }
@@ -495,16 +488,16 @@ bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor,
     paramData[29] = 0x00;
 
     // Send the set parameter command
-    if (!sendCommand(ld2411Serial, 0x0067, paramData, 30, sensor)) {
+    if (!sendCommand(0x0067, paramData, 30, sensor)) {
         Serial.println("Failed to set parameters");
-        sendEndConfig(ld2411Serial, sensor);
+        sendEndConfig(sensor);
         return false;
     }
 
     Serial.println("Parameters set successfully");
 
     // Disable configuration mode
-    if (!sendEndConfig(ld2411Serial, sensor)) {
+    if (!sendEndConfig(sensor)) {
         Serial.println("Warning: Failed to disable configuration mode");
     }
 
@@ -512,22 +505,27 @@ bool setParameter(HardwareSerial &ld2411Serial, mmWaveSensor &sensor,
 }
 
 // Helper functions to set specific parameters
-bool setMaxMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
-    return setParameter(ld2411Serial, sensor, sensor.maxMotionRange, value);
+bool setMaxMotionRange(mmWaveSensor &sensor, uint16_t value) {
+    sensor.maxMotionRange.value = value;
+    return setParameter(sensor, sensor.maxMotionRange, value);
 }
 
-bool setMinMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
-    return setParameter(ld2411Serial, sensor, sensor.minMotionRange, value);
+bool setMinMotionRange(mmWaveSensor &sensor, uint16_t value) {
+    sensor.minMotionRange.value = value;
+    return setParameter(sensor, sensor.minMotionRange, value);
 }
 
-bool setMaxMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
-    return setParameter(ld2411Serial, sensor, sensor.maxMicroMotionRange, value);
+bool setMaxMicroMotionRange(mmWaveSensor &sensor, uint16_t value) {
+    sensor.maxMicroMotionRange.value = value;
+    return setParameter(sensor, sensor.maxMicroMotionRange, value);
 }
 
-bool setMinMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
-    return setParameter(ld2411Serial, sensor, sensor.minMicroMotionRange, value);
+bool setMinMicroMotionRange(mmWaveSensor &sensor, uint16_t value) {
+    sensor.minMicroMotionRange.value = value;
+    return setParameter(sensor, sensor.minMicroMotionRange, value);
 }
 
-bool setNoOneWaitingTime(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value) {
-    return setParameter(ld2411Serial, sensor, sensor.noOneWaitingTime, value);
+bool setNoOneWaitingTime(mmWaveSensor &sensor, uint16_t value) {
+    sensor.noOneWaitingTime.value = value;
+    return setParameter(sensor, sensor.noOneWaitingTime, value);
 }
