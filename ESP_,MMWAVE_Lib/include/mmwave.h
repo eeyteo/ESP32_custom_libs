@@ -35,11 +35,12 @@ struct mmWaveSensor {
     bool notifiedAbsence;
 
     // Parameters
-    intValue maxMotionRange;
-    intValue minMotionRange;
-    intValue maxMicroMotionRange;
-    intValue minMicroMotionRange;
-    intValue noOneWaitingTime; //[ds]
+    intValue maxMotionRange;        //[cm] 
+    intValue minMotionRange;        //[cm]
+    intValue maxMicroMotionRange;   //[cm]
+    intValue minMicroMotionRange;   //[cm]
+    intValue noOneWaitingTime;      //[ds]
+
     // debounce variables
     unsigned long lastPresenceTime;
     unsigned long lastAbsenceTime;
@@ -82,6 +83,7 @@ struct mmWaveSensor {
         absenceDebounceDelay(3000) {}
                     
     void showFrame() {
+        // This method prints the contents of the mmWaveBuffer in a readable format for debugging.
         Serial.print("mmWave Frame of lenth ");
         Serial.print(buf_len);
         Serial.print(". Data: ");
@@ -91,13 +93,16 @@ struct mmWaveSensor {
         }
         Serial.println();
     }
+
     void reset() {
+        // This method resets the buffer index and length, and clears the buffer for the next frame.
         mmWaveIdx = 0;
         buf_len = 0;
         memset(mmWaveBuffer, 0, BUF_SIZE);
     }
 
     void showParam() {
+        // This method prints the current parameters of the sensor in a readable format.
         Serial.println("=== LD2411-S Current Parameters ===");
         Serial.printf("Maximum Motion Range: %d cm (Range: %d-%d)\n", 
                       maxMotionRange.value, maxMotionRange.min, maxMotionRange.max);
@@ -123,8 +128,7 @@ bool sendEnableConfig(mmWaveSensor &sensor);
 bool sendEndConfig(mmWaveSensor &sensor);
 bool sendCommand(uint16_t cmdId, const uint8_t* data, uint8_t dataLen, mmWaveSensor &sensor);
 bool getParam(mmWaveSensor &sensor);
-bool setParameter(mmWaveSensor &sensor, 
-                  intValue &paramToSet, uint16_t newValue);
+bool setParameter(mmWaveSensor &sensor, intValue &paramToSet, uint16_t newValue);
 bool setMaxMotionRange(mmWaveSensor &sensor, uint16_t value);
 bool setMinMotionRange(mmWaveSensor &sensor, uint16_t value);
 bool setMaxMicroMotionRange(mmWaveSensor &sensor, uint16_t value);
