@@ -69,6 +69,65 @@ Used for debugging or verification.
 - `bool setMinMicroMotionRange(mmWaveSensor &sensor, uint16_t value);`
 - `bool setNoOneWaitingTime(mmWaveSensor &sensor, uint16_t value);`
 
+### Initialization
+
+```cpp
+void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+```
+Initializes the LD2411S mmWave sensor and checks connectivity.
+
+### Listening for Presence
+
+```cpp
+void listenMMwave(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+```
+Reads data from the sensor and updates presence status.
+
+### Checking Connection
+
+```cpp
+bool checkMMWaveConnection(HardwareSerial &ld2411Serial);
+```
+Checks if the sensor is connected and responsive.
+
+### Reading Parameters
+
+```cpp
+bool getParam(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+```
+Reads configuration parameters from the sensor.
+
+### Setting Parameters
+
+```cpp
+bool setMaxMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setMinMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setMaxMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setMinMicroMotionRange(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+bool setNoOneWaitingTime(HardwareSerial &ld2411Serial, mmWaveSensor &sensor, uint16_t value);
+```
+Use these functions to configure the sensor’s detection ranges and waiting time.
+
+---
+
+**Example Usage:**
+
+```cpp
+HardwareSerial Serial2(2);
+mmWaveSensor sensor;
+
+void setup() {
+  Serial.begin(115200);
+  initMMWaveSensor(Serial2, sensor);
+}
+
+void loop() {
+  listenMMwave(Serial2, sensor);
+  // Use sensor.presenceDetected for your logic
+}
+```
+
+
 ## How to use
 Add the folder ESP_MMWAVE_Lib to your PlatoformIO\Libs folder. You can usually find it in
 `C:\Users\khons\Documents\PlatformIO\Libs`
