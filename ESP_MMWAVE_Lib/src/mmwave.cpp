@@ -64,12 +64,19 @@ void processFrame(mmWaveSensor &sensor) {
     //Serial.println(dataType, HEX);
     unsigned long currentTime = millis();
     
+    // Refresh distance and presence timestamp on EVERY presence frame; the
+    // one-shot notification block below must not gate the debounce timing.
+    if(dataType == 0x02 || dataType == 0x01) {
+      sensor.distance = sensor.mmWaveBuffer[3] | (sensor.mmWaveBuffer[4] << 8);
+      sensor.lastPresenceTime = currentTime;
+    }
+
     if((dataType == 0x02 || dataType == 0x01)  && !sensor.notifiedPresence) { // Micromotion or motion
       Serial.println("Data type: Micromotion target (0x02)");
       
       
-      // Extract distance data (bytes 5-6, little endian)
-      uint16_t distance = (sensor.mmWaveBuffer[3] << 8) | sensor.mmWaveBuffer[4];
+      // Distance is little-endian at bytes 3-4 of the report frame (DD_lo DD_hi)
+      uint16_t distance = sensor.mmWaveBuffer[3] | (sensor.mmWaveBuffer[4] << 8);
       Serial.print("Distance: ");
       Serial.print(distance);
       Serial.println(" cm");
@@ -96,8 +103,6 @@ void processFrame(mmWaveSensor &sensor) {
         //Serial.println("Ignoring brief absence (debouncing)");
       }
     }
-
-    
     
   } else {
     Serial.println("No AAAA header found");
@@ -106,6 +111,12 @@ void processFrame(mmWaveSensor &sensor) {
 
 void initMMWaveSensor(mmWaveSensor &sensor) {
   // This function initializes the LD2411S sensor
+
+  if (sensor.serialPort == nullptr) {
+    Serial.println("initMMWaveSensor: serialPort not set - use the (HardwareSerial&, mmWaveSensor&) overload or the 3-arg constructor");
+    sensor.connected = false;
+    return;
+  }
 
   // Initialize serial
   sensor.serialPort->begin(256000, SERIAL_8N1, sensor.rxPin, sensor.txPin);
@@ -120,6 +131,12 @@ void initMMWaveSensor(mmWaveSensor &sensor) {
     sensor.connected = false;
     Serial.println("LD2411S not responding to getParam");
   }
+}
+
+void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor) {
+  // Bind the serial port to the sensor, then run the standard initialisation.
+  sensor.serialPort = &ld2411Serial;
+  initMMWaveSensor(sensor);
 }
 
 bool checkMMWaveConnection(HardwareSerial &ld2411Serial) {
@@ -179,11 +196,13 @@ bool waitForAck(uint16_t expectedid, mmWaveSensor &sensor, unsigned long timeout
       if(b == 0xFD) start_frame = true; // Potential start of frame
 
       // Store in temporary buffer if the first characters match the header
-      if (idx < sizeof(tempBuffer) && start_frame) {
+      if (start_frame && idx < sizeof(tempBuffer)) {
         tempBuffer[idx++] = b;
       } else {
-        //Serial.println("\nTemp buffer full, or start not detected. Resetting.");
-        sensor.reset();
+        // Resynchronise the parser: drop the partial frame and hunt for the
+        // next 0xFD header (otherwise stale idx/start_frame stick forever).
+        idx = 0;
+        start_frame = false;
         continue;
       }
 
@@ -221,8 +240,9 @@ bool waitForAck(uint16_t expectedid, mmWaveSensor &sensor, unsigned long timeout
                 }
               }
             }
-            // Frame processed, reset for next one
-            sensor.reset();
+            // Frame consumed (matched or not) - resync for the next one
+            idx = 0;
+            start_frame = false;
           }
         }
       }

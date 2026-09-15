@@ -122,6 +122,7 @@ struct mmWaveSensor {
 void listenMMwave(mmWaveSensor &sensor);
 void processFrame(mmWaveSensor &sensor);
 void initMMWaveSensor(mmWaveSensor &sensor);
+void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
 bool checkMMWaveConnection(HardwareSerial &ld2411Serial) ;
 bool waitForAck(uint16_t expectedid, mmWaveSensor &sensor, unsigned long timeout = 2000);
 bool sendEnableConfig(mmWaveSensor &sensor);

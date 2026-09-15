@@ -1,25 +1,136 @@
-# ESP32 Custom Libraries
+# LD2411S library for ESP
+This simple library purpose is to integrate the mm wave sensor LD2411s into a platformIO based
+ESP32 powered IoT project.
+The comunication protocol (UART) has been published by the manufacturer and therefore integration is 
+possible without reverse engineerein.
 
-A collection of libraries for the ESP32 platform, designed to simplify common tasks and hardware integration.
+## Parameters
+The sensor has 5 parameters
+- maxMotionRange [cm] 
+- minMotionRange [cm]
+- maxMicroMotionRange [cm]
+- minMicroMotionRange[cm]
+- noOneWaitingTime[ds]
 
-## Features
+## Methods
+The object mmWaveSensor has the following methods:
 
+- `void showFrame();`
 
-- mmWave LD2411S sensor support
-- integration with Home Assistant
+Description
 
-## Usage
+Prints the current received frame in hexadecimal format for debugging.
 
-Include the libraries in your PlatformIO project. Add to plarformIO.ini file this project
+Used during protocol reverse engineering or validation.
 
-```xml
-lib_extra_dirs = ..\PlatformIO\Libs
+- `void reset();`
+
+Description
+
+Resets:
+
++ Buffer index
+
++ Frame length
+
++ Clears internal buffer
+
+Used after frame processing or error recovery.
+
+- `void showParam();`
+
+Description
+
+Prints all current configuration parameters including:
+
+Value
+
++ Allowed range
+
++ Converted time (seconds)
+
+Used for debugging or verification.
+
+## Functions
+
+- `void listenMMwave(mmWaveSensor &sensor);`
+- `void processFrame(mmWaveSensor &sensor);`
+- `void initMMWaveSensor(mmWaveSensor &sensor);`
+- `bool checkMMWaveConnection(HardwareSerial &ld2411Serial);`
+- `bool waitForAck(uint16_t expectedid, mmWaveSensor &sensor, unsigned long timeout = 2000);`
+- `bool sendEnableConfig(mmWaveSensor &sensor);`
+- `bool sendEndConfig(mmWaveSensor &sensor);`
+- `bool sendCommand(uint16_t cmdId, const uint8_t* data, uint8_t dataLen, mmWaveSensor &sensor);`
+- `bool getParam(mmWaveSensor &sensor);`
+- `bool setParameter(mmWaveSensor &sensor, intValue &paramToSet, uint16_t newValue);`
+- `bool setMaxMotionRange(mmWaveSensor &sensor, uint16_t value);`
+- `bool setMinMotionRange(mmWaveSensor &sensor, uint16_t value);`
+- `bool setMaxMicroMotionRange(mmWaveSensor &sensor, uint16_t value);`
+- `bool setMinMicroMotionRange(mmWaveSensor &sensor, uint16_t value);`
+- `bool setNoOneWaitingTime(mmWaveSensor &sensor, uint16_t value);`
+
+### Initialization
+
+```cpp
+void initMMWaveSensor(HardwareSerial &ld2411Serial, mmWaveSensor &sensor);
+void initMMWaveSensor(mmWaveSensor &sensor);
+```
+Initializes the LD2411S mmWave sensor and checks connectivity.
+
+### Listening for Presence
+
+```cpp
+void listenMMwave(mmWaveSensor &sensor);
+```
+Reads data from the sensor and updates presence status.
+
+### Checking Connection
+
+```cpp
+bool checkMMWaveConnection(HardwareSerial &ld2411Serial);
+```
+Checks if the sensor is connected and responsive.
+
+### Reading Parameters
+
+```cpp
+bool getParam(mmWaveSensor &sensor);
+```
+Reads configuration parameters from the sensor.
+
+### Setting Parameters
+
+```cpp
+bool setMaxMotionRange(mmWaveSensor &sensor, uint16_t value);
+bool setMinMotionRange(mmWaveSensor &sensor, uint16_t value);
+bool setMaxMicroMotionRange(mmWaveSensor &sensor, uint16_t value);
+bool setMinMicroMotionRange(mmWaveSensor &sensor, uint16_t value);
+bool setNoOneWaitingTime(mmWaveSensor &sensor, uint16_t value);
+```
+Use these functions to configure the sensor’s detection ranges and waiting time.
+
+---
+
+**Example Usage:**
+
+```cpp
+HardwareSerial Serial2(2);
+mmWaveSensor sensor;
+
+void setup() {
+  Serial.begin(115200);
+  initMMWaveSensor(Serial2, sensor);
+}
+
+void loop() {
+  listenMMwave(sensor);
+  // Use sensor.presenceDetected for your logic
+}
 ```
 
-## ESP32_MMWAVE_Lib
-Since the 2025.2.0 breking changes to ESP Home, unfortunatelly it's no longer possible to easily integrate sensors such as the mmWave LD2411S into ESP Home. A standard platformIO project is required.
 
-
-## License
-
-MIT License
+## How to use
+Add the folder ESP_MMWAVE_Lib to your PlatoformIO\Libs folder. You can usually find it in
+`C:\Users\khons\Documents\PlatformIO\Libs`
+In your main project's platformio.ini config file,
+`lib_extra_dirs = C:\Users\khons\Documents\PlatformIO\Libs`
