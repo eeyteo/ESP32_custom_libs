@@ -1,0 +1,14 @@
+{
+  "name": "ESP_EEPROM_Lib",
+  "version": "1.0.0",
+  "description": "Typed helpers to read and write String, int and bool values in the Arduino EEPROM emulation (ESP32 / ESP8266).",
+  "keywords": [
+    "eeprom",
+    "persistence",
+    "esp32",
+    "esp8266",
+    "arduino"
+  ],
+  "frameworks": "arduino",
+  "platforms": "*"
+}

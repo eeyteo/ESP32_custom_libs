@@ -1,6 +1,5 @@
-# LD2411S library for ESP
-This simple library purpose is to integrate the mm wave sensor LD2411s into a platformIO based
-ESP32 powered IoT project.
+# LD2411S driver for ESP
+This simple driver's purpose is to integrate the mm wave sensor LD2411s into a platformIO based ESP32 powered IoT project.
 The comunication protocol (UART) has been published by the manufacturer and therefore integration is 
 possible without reverse engineerein.
 

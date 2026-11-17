@@ -64,8 +64,7 @@ void processFrame(mmWaveSensor &sensor) {
     //Serial.println(dataType, HEX);
     unsigned long currentTime = millis();
     
-    // Refresh distance and presence timestamp on EVERY presence frame; the
-    // one-shot notification block below must not gate the debounce timing.
+    // Refresh distance and presence timestamp on every presence frame
     if(dataType == 0x02 || dataType == 0x01) {
       sensor.distance = sensor.mmWaveBuffer[3] | (sensor.mmWaveBuffer[4] << 8);
       sensor.lastPresenceTime = currentTime;
